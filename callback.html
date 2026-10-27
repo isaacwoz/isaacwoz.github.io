@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>Bank Authorisation | Personal Finance Assistant</title>
+  <style>
+    :root { color-scheme: light; --ink:#172137; --muted:#526176; --line:#dfe5ec; --bg:#f7f9fc; --accent:#2053a1; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; line-height:1.55; }
+    main { max-width:670px; margin:clamp(42px,11vh,110px) auto 50px; padding:0 20px; }
+    .brand { font-size:0.83rem; font-weight:750; letter-spacing:.06em; text-transform:uppercase; color:var(--accent); margin:0 0 18px; }
+    .card { background:white; border:1px solid var(--line); border-radius:18px; padding:clamp(23px,5vw,40px); box-shadow:0 10px 40px rgba(28,45,70,.05); }
+    h1 { font-size:clamp(1.5rem,4vw,2rem); line-height:1.2; letter-spacing:-.025em; margin:0 0 14px; }
+    p { margin:12px 0; }
+    .muted { color:var(--muted); }
+    .status { display:inline-flex; align-items:center; border-radius:999px; padding:5px 11px; background:#eef2fb; color:var(--accent); font-size:.85rem; font-weight:650; margin-bottom:20px; }
+    .status.success { background:#eaf7f0; color:#17683e; }
+    .status.error { background:#fff0ef; color:#9a2922; }
+    label { display:block; font-weight:700; font-size:.9rem; margin:22px 0 8px; }
+    .code { display:block; width:100%; font:500 .95rem ui-monospace, SFMono-Regular,Consolas,monospace; color:var(--ink); border:1px solid #bdc9d9; border-radius:9px; background:#fafbfd; padding:13px; min-height:46px; }
+    .button-row { display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
+    button { cursor:pointer; border:1px solid var(--accent); border-radius:9px; background:var(--accent); color:white; padding:10px 16px; font:650 .92rem inherit; font-weight:650; }
+    button.secondary { background:#fff; color:var(--accent); }
+    button:focus-visible { outline:3px solid #95b7ee; outline-offset:2px; }
+    .note { font-size:.9rem; background:#f5f7fa; border-left:3px solid #9daece; margin-top:27px; padding:10px 15px; color:#435169; }
+    #details { display:none; }
+    #feedback { min-height:1.5em; color:#17683e; font-size:.9rem; }
+    footer { font-size:.8rem; color:var(--muted); text-align:center; margin-top:19px; }
+    footer a { color:var(--accent); text-decoration:none; }
+    [hidden] { display:none !important; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand">Personal Finance Assistant</div>
+    <section class="card" aria-labelledby="heading">
+      <div id="status" class="status">Checking bank response</div>
+      <h1 id="heading">Bank authorisation callback</h1>
+      <p id="message" class="muted">Checking whether your bank returned an authorisation code.</p>
+
+      <div id="details" hidden>
+        <label for="authCode">Temporary authorisation code</label>
+        <input id="authCode" class="code" type="password" readonly autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="codeHelp">
+        <div class="button-row">
+          <button type="button" id="copyCode">Copy code</button>
+          <button type="button" id="toggleCode" class="secondary">Show code</button>
+        </div>
+        <p id="feedback" role="status" aria-live="polite"></p>
+        <p id="codeHelp" class="muted">Paste this code into your local integration to complete authorisation. It is temporary and may only be used once.</p>
+        <div id="stateSection" hidden>
+          <label for="stateValue">Returned state (for verification)</label>
+          <input id="stateValue" class="code" type="text" readonly autocomplete="off" spellcheck="false">
+          <p class="muted" style="font-size:.86rem">Your script should verify that this matches the state value it originally sent.</p>
+        </div>
+      </div>
+
+      <div class="note">This page runs locally in your browser after loading. It does not submit your code to an API or store it on this website. The authorisation code is removed from the visible address bar, but it can still have been recorded by the hosting service when the page was requested. Keep it private and use it promptly.</div>
+    </section>
+    <footer><a href="privacy.html" rel="noreferrer">Privacy Policy</a> &nbsp;·&nbsp; <a href="terms.html" rel="noreferrer">Terms</a></footer>
+  </main>
+  <script>
+    (() => {
+      'use strict';
+      // Read the response once and immediately remove sensitive URL parameters.
+      const params = new URLSearchParams(window.location.search);
+      const fragment = window.location.hash.startsWith('#')
+        ? new URLSearchParams(window.location.hash.slice(1))
+        : new URLSearchParams();
+      const read = key => params.get(key) || fragment.get(key) || '';
+      const code = read('code');
+      const state = read('state');
+      const error = read('error');
+      const errorDescription = read('error_description');
+      try {
+        window.history.replaceState(null, '', window.location.pathname);
+      } catch (_) { /* Browsers may restrict history changes; the page still functions. */ }
+
+      const status = document.getElementById('status');
+      const message = document.getElementById('message');
+      const heading = document.getElementById('heading');
+      const details = document.getElementById('details');
+      const feedback = document.getElementById('feedback');
+      const input = document.getElementById('authCode');
+
+      if (error) {
+        status.textContent = 'Authorisation unsuccessful';
+        status.className = 'status error';
+        heading.textContent = 'Bank authorisation did not complete';
+        message.textContent = errorDescription || `The bank returned an error: ${error}. Try authorising again from your agent.`;
+      } else if (code) {
+        status.textContent = 'Code received';
+        status.className = 'status success';
+        heading.textContent = 'Bank authorisation code received';
+        message.textContent = 'Your bank returned a temporary code. Your account is not yet connected: your local script must exchange this code with Enable Banking to create the session.';
+        details.hidden = false;
+        details.style.display = 'block';
+        input.value = code;
+        if (state) {
+          document.getElementById('stateSection').hidden = false;
+          document.getElementById('stateValue').value = state;
+        }
+      } else {
+        status.textContent = 'No code found';
+        status.className = 'status';
+        heading.textContent = 'Ready for a bank redirect';
+        message.textContent = 'This page is working. After you approve bank access, Enable Banking should redirect you here with a temporary code. Start that authorisation from your local script.';
+      }
+
+      document.getElementById('toggleCode').addEventListener('click', function () {
+        const reveal = input.type === 'password';
+        input.type = reveal ? 'text' : 'password';
+        this.textContent = reveal ? 'Hide code' : 'Show code';
+      });
+
+      document.getElementById('copyCode').addEventListener('click', async () => {
+        if (!code) return;
+        try {
+          await navigator.clipboard.writeText(code);
+          feedback.textContent = 'Code copied. Paste it into your local script.';
+        } catch (_) {
+          // Manual copying is possible without persisting or sending the code.
+          input.type = 'text';
+          document.getElementById('toggleCode').textContent = 'Hide code';
+          input.focus();
+          input.select();
+          feedback.textContent = 'Automatic copying was blocked. Copy the selected code manually.';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
